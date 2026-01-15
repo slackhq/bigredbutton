@@ -183,7 +183,7 @@ To run tests with coverage:
 ```bash
 pytest tests/ --cov=plugins/big_red_button --cov-report=term-missing
 ```
-
+testing
 ## 📁 Project Structure
 
 ```
