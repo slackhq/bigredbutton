@@ -77,18 +77,18 @@
                 {% elif recent_failures|length == 0 %}
                 <tr><td colspan="9">No failures in the last {{ clear_window }}.</td></tr>
                 {% endif %}
-                {% for fail in recent_failures %}
+                {% for dag_id in recent_failures.keys() %}
                 <tr>
                     <td>
-                        <a href="{{ url_for('Airflow.'+ 'grid', dag_id=fail.dag_id) }}"><strong>{{ fail.dag_id }}</strong></a>
+                        <a href="{{ url_for('Airflow.'+ 'grid', dag_id=dag_id) }}"><strong>{{ dag_id }}</strong></a>
                     </td>
                     <td>
-                        <strong>{{ fail.failure_count }}</strong>
+                        <strong>{{ recent_failures.get(dag_id)|length }}</strong>
                     </td>
                     <td>
                         <form action="clear_failed_tasks", method="post">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="dag_id" value="{{ fail.dag_id }}">
+                            <input type="hidden" name="dag_id" value="{{ dag_id }}">
                             <input type="hidden" name="clear_window" value="{{ clear_window }}">
                             <button type="submit" id="clear_failed_tasks" class="btn btn-danger" style="width: 100%">Clear Failed Tasks</button>
                         </form>

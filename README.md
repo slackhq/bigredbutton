@@ -135,6 +135,9 @@ make setup
 # Run tests
 make test
 
+# Format code
+make format
+
 # Run tests with verbose output
 make test-verbose
 

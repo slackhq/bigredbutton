@@ -15,6 +15,7 @@
 # limitations under the License.
 from ast import literal_eval
 from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional, Any, Generator
 
 from airflow.jobs.job import Job
 from airflow.models import DagTag, DagModel, TaskInstance, clear_task_instances, Log
@@ -23,7 +24,7 @@ from airflow.utils.session import create_session
 from airflow.www.auth import has_access_view
 from airflow.www.extensions.init_auth_manager import get_auth_manager
 
-from flask import Blueprint
+from flask import Blueprint, Response
 from flask_appbuilder import BaseView, expose
 from flask import (
     redirect,
@@ -31,7 +32,8 @@ from flask import (
     session as flask_session,
     url_for,
 )
-from sqlalchemy import func, tuple_
+from sqlalchemy import tuple_
+from sqlalchemy.orm import Session
 
 ONE_HOUR = "1_hour"
 FILTER_TAGS_COOKIE = "tags_filter"
@@ -55,7 +57,7 @@ bp = Blueprint(
 )
 
 
-def handle_clearing(session, recent_failures):
+def handle_clearing(session: Session, recent_failures: List[TaskInstance]) -> None:
     """Clear failed task instances in batches and log the operation.
 
     Args:
@@ -71,7 +73,7 @@ def handle_clearing(session, recent_failures):
         index = index + PAGE_SIZE
 
 
-def log_clearing(rows_cleared):
+def log_clearing(rows_cleared: int) -> None:
     """Log a big red button clearing event to the Airflow logs table.
 
     Args:
@@ -106,7 +108,9 @@ def log_clearing(rows_cleared):
         session.commit()
 
 
-def get_recent_failures_paged(session, time_cutoff, dag_ids=None):
+def get_recent_failures_paged(
+    session: Session, time_cutoff: datetime, dag_ids: Optional[List[str]] = None
+) -> Generator[List[TaskInstance], None, None]:
     """Query for failed and upstream_failed task instances since a given time.
 
     Yields results in pages to avoid loading too much data at once.
@@ -159,7 +163,9 @@ def get_recent_failures_paged(session, time_cutoff, dag_ids=None):
             yield batch_failures
 
 
-def get_recent_failures(session, time_cutoff, dag_ids=None):
+def get_recent_failures(
+    session: Session, time_cutoff: datetime, dag_ids: Optional[List[str]] = None
+) -> List[TaskInstance]:
     """Query for failed and upstream_failed task instances since a given time.
 
     Optimized to use IN clause with tuple comparison instead of subquery join.
@@ -172,72 +178,23 @@ def get_recent_failures(session, time_cutoff, dag_ids=None):
         dag_ids: Optional list of DAG IDs to filter by
 
     Returns:
-        List of TaskInstance objects matching the failure criteria (both failed and upstream_failed)
+        List of TaskInstance objects matching the failure criteria (both failed and upstream_failed),
+        sorted by dag_id, run_id, and task_id
     """
     all_failures = []
     for batch in get_recent_failures_paged(session, time_cutoff, dag_ids):
         all_failures.extend(batch)
+
+    # Sort the final combined list to ensure consistent ordering
+    all_failures.sort(
+        key=lambda ti: (ti.dag_id, ti.run_id, ti.task_id, ti.map_index or -1)
+    )
     return all_failures
 
 
-def get_recent_failure_counts(session, time_cutoff, dag_ids=None):
-    """Query for recent failure counts grouped by DAG ID.
-
-    Optimized to materialize failed run pairs first, avoiding expensive
-    subquery evaluation in the aggregate query.
-
-    Args:
-        session: SQLAlchemy database session
-        time_cutoff: Datetime threshold - only count failures after this time
-        dag_ids: Optional list of DAG IDs to filter by
-
-    Returns:
-        List of tuples (dag_id, failure_count) with counts of failed and upstream_failed
-        tasks per DAG, or empty list if no failures found
-    """
-    # First, materialize all (dag_id, run_id) pairs with recent failures
-    # We need to get the failed tasks first, since upstream_failures won't have a Job to query
-    failed_runs_query = (
-        session.query(TaskInstance.dag_id, TaskInstance.run_id)
-        .distinct()
-        .filter(TaskInstance.state == "failed")
-        .filter(Job.latest_heartbeat > time_cutoff)
-        .filter(Job.job_type == "LocalTaskJob")
-        .join(Job, Job.id == TaskInstance.job_id)
-    )
-
-    if dag_ids:
-        failed_runs_query = failed_runs_query.filter(TaskInstance.dag_id.in_(dag_ids))
-
-    # Execute the query once to get all failed run pairs
-    failed_runs = failed_runs_query.all()
-
-    if not failed_runs:
-        return []
-
-    # Use the materialized pairs for the count query
-    recent_failures_query = (
-        session.query(
-            TaskInstance.dag_id, func.count(TaskInstance.task_id).label("failure_count")
-        )
-        .filter(TaskInstance.state.in_(["failed", "upstream_failed"]))
-        .filter(tuple_(TaskInstance.dag_id, TaskInstance.run_id).in_(failed_runs))
-        .group_by(TaskInstance.dag_id)
-    )
-
-    recent_failures_counts = recent_failures_query.all()
-
-    # Handle SqlAlchemy returning empty list when no rows match
-    if len(recent_failures_counts) == 0:
-        return []
-
-    if len(recent_failures_counts) == 1 and not recent_failures_counts[0].dag_id:
-        return []
-
-    return recent_failures_counts
-
-
-def group_failures_by_dag(failures):
+def group_failures_by_dag(
+    failures: List[TaskInstance],
+) -> Dict[str, List[TaskInstance]]:
     """Group task instances by DAG ID.
 
     Args:
@@ -256,7 +213,7 @@ def group_failures_by_dag(failures):
     return failures_by_dag
 
 
-def get_dag_ids(session, tags_filter):
+def get_dag_ids(session: Session, tags_filter: List[str]) -> List[str]:
     """Get DAG IDs for active, non-paused DAGs matching the specified tags.
 
     Args:
@@ -277,7 +234,9 @@ def get_dag_ids(session, tags_filter):
     return [dag_id for (dag_id,) in dag_ids]
 
 
-def get_dag_tags(session, tags_filter):
+def get_dag_tags(
+    session: Session, tags_filter: Optional[List[str]]
+) -> List[Dict[str, Any]]:
     """Get all distinct DAG tags with selection status.
 
     Args:
@@ -301,11 +260,13 @@ def get_dag_tags(session, tags_filter):
 class BigRedButtonViewMixin:
     """Mixin class providing common clearing functionality for Big Red Button views."""
 
-    def _get_redirect_url(self):
+    def _get_redirect_url(self) -> str:
         """Get the URL to redirect to after clearing. Override in subclasses."""
         raise NotImplementedError
 
-    def _render_clear_failed_dags(self, clear_window, dag_ids):
+    def _render_clear_failed_dags(
+        self, clear_window: str, dag_ids: Optional[List[str]]
+    ) -> str:
         """Render the confirmation page for clearing failed DAGs.
 
         Args:
@@ -328,7 +289,9 @@ class BigRedButtonViewMixin:
                 endpoint="clear_failed_dags/confirm",
             )
 
-    def _execute_clear_failed_dags(self, clear_window, dag_ids):
+    def _execute_clear_failed_dags(
+        self, clear_window: str, dag_ids: Optional[List[str]]
+    ) -> Response:
         """Execute the clearing of failed DAGs after confirmation.
 
         Args:
@@ -346,7 +309,7 @@ class BigRedButtonViewMixin:
             handle_clearing(session, recent_failures)
             return redirect(self._get_redirect_url())
 
-    def _render_clear_failed_tasks(self, clear_window, dag_id):
+    def _render_clear_failed_tasks(self, clear_window: str, dag_id: str) -> str:
         """Render the confirmation page for clearing failed tasks of a specific DAG.
 
         Args:
@@ -367,7 +330,7 @@ class BigRedButtonViewMixin:
                 endpoint="clear_failed_tasks/confirm",
             )
 
-    def _execute_clear_failed_tasks(self, clear_window, dag_id):
+    def _execute_clear_failed_tasks(self, clear_window: str, dag_id: str) -> Response:
         """Execute the clearing of failed tasks for a specific DAG after confirmation.
 
         Args:
@@ -391,13 +354,13 @@ class BigRedButtonBaseView(BigRedButtonViewMixin, BaseView):
 
     default_view = "big_red_button"
 
-    def _get_redirect_url(self):
+    def _get_redirect_url(self) -> str:
         """Get the URL to redirect to after clearing."""
         return "/bigredbuttonbaseview"
 
     @expose("/")
     @has_access_view()
-    def big_red_button(self):
+    def big_red_button(self) -> str:
         """Render the main Big Red Button page with tag filtering and failure counts.
 
         Handles tag filtering via URL params and session cookies, allowing users to
@@ -428,28 +391,29 @@ class BigRedButtonBaseView(BigRedButtonViewMixin, BaseView):
         with create_session() as session:
             tags = get_dag_tags(session, tags_filter)
 
-            recent_failure_counts = []
+            recent_failures_by_dag = {}
             if tags_filter:
                 dag_ids = get_dag_ids(session, tags_filter)
                 if dag_ids:
                     time_cutoff = (
-                            datetime.now(timezone.utc) - clear_windows[clear_window]
+                        datetime.now(timezone.utc) - clear_windows[clear_window]
                     )
-                    recent_failure_counts = get_recent_failure_counts(
+                    recent_failures = get_recent_failures(
                         session, time_cutoff=time_cutoff, dag_ids=dag_ids
                     )
+                    recent_failures_by_dag = group_failures_by_dag(recent_failures)
 
             return self.render_template(
                 "big_red_button.html",
                 clear_window=clear_window,
-                recent_failures=recent_failure_counts,
+                recent_failures=recent_failures_by_dag,
                 tags=tags,
                 tags_filter=tags_filter,
             )
 
     @expose("/clear_failed_dags", methods=["POST"])
     @has_access_view()
-    def clear_failed_dags(self):
+    def clear_failed_dags(self) -> Optional[str]:
         """Display confirmation page showing all failed and upstream_failed tasks grouped by DAG ID.
 
         This is the first step of the two-step clearing process for DAGs.
@@ -468,7 +432,7 @@ class BigRedButtonBaseView(BigRedButtonViewMixin, BaseView):
 
     @expose("/clear_failed_dags/confirm", methods=["POST"])
     @has_access_view()
-    def _clear_failed_dags(self):
+    def _clear_failed_dags(self) -> Optional[Response]:
         """Execute the actual clearing of failed and upstream_failed tasks after confirmation.
 
         This is the second step that performs the clearing operation.
@@ -487,7 +451,7 @@ class BigRedButtonBaseView(BigRedButtonViewMixin, BaseView):
 
     @expose("/clear_failed_tasks", methods=["POST"])
     @has_access_view()
-    def clear_failed_tasks(self):
+    def clear_failed_tasks(self) -> Optional[str]:
         """Display confirmation page showing failed and upstream_failed tasks for a specific DAG.
 
         This is the first step of the two-step clearing process for individual tasks.
@@ -499,7 +463,7 @@ class BigRedButtonBaseView(BigRedButtonViewMixin, BaseView):
 
     @expose("/clear_failed_tasks/confirm", methods=["POST"])
     @has_access_view()
-    def _clear_failed_tasks(self):
+    def _clear_failed_tasks(self) -> Optional[Response]:
         """Execute the actual clearing of failed and upstream_failed tasks for a specific DAG after confirmation.
 
         This is the second step that performs the clearing operation.
@@ -515,32 +479,31 @@ class BigRedButtonAdminBaseView(BigRedButtonViewMixin, BaseView):
 
     default_view = "big_red_button_admin"
 
-    def _get_redirect_url(self):
+    def _get_redirect_url(self) -> str:
         """Get the URL to redirect to after clearing."""
         return "/bigredbuttonadminbaseview"
 
     @expose("/")
     @has_access_view()
-    def big_red_button_admin(self):
+    def big_red_button_admin(self) -> str:
         """Render the admin Big Red Button page showing all DAG failures without tag filtering."""
         clear_window = request.args.get("clear_window")
         if not clear_window:
             clear_window = ONE_HOUR
         time_cutoff = datetime.now(timezone.utc) - clear_windows[clear_window]
         with create_session() as session:
-            recent_failure_counts = get_recent_failure_counts(
-                session, time_cutoff=time_cutoff
-            )
+            recent_failures = get_recent_failures(session, time_cutoff=time_cutoff)
+            recent_failures_by_dag = group_failures_by_dag(recent_failures)
 
             return self.render_template(
                 "big_red_button_admin.html",
                 clear_window=clear_window,
-                recent_failures=recent_failure_counts,
+                recent_failures=recent_failures_by_dag,
             )
 
     @expose("/clear_failed_dags", methods=["POST"])
     @has_access_view()
-    def clear_failed_dags(self):
+    def clear_failed_dags(self) -> str:
         """Display confirmation page showing all failed and upstream_failed tasks (admin version without tag filtering).
 
         This is the first step of the two-step clearing process for all DAGs.
@@ -550,7 +513,7 @@ class BigRedButtonAdminBaseView(BigRedButtonViewMixin, BaseView):
 
     @expose("/clear_failed_dags/confirm", methods=["POST"])
     @has_access_view()
-    def _clear_failed_dags(self):
+    def _clear_failed_dags(self) -> Response:
         """Execute the actual clearing of all failed and upstream_failed tasks after confirmation (admin version).
 
         This is the second step that performs the clearing operation.
@@ -560,7 +523,7 @@ class BigRedButtonAdminBaseView(BigRedButtonViewMixin, BaseView):
 
     @expose("/clear_failed_tasks", methods=["POST"])
     @has_access_view()
-    def clear_failed_tasks(self):
+    def clear_failed_tasks(self) -> Optional[str]:
         """Display confirmation page showing failed and upstream_failed tasks for a specific DAG (admin version).
 
         This is the first step of the two-step clearing process for individual tasks.
@@ -572,7 +535,7 @@ class BigRedButtonAdminBaseView(BigRedButtonViewMixin, BaseView):
 
     @expose("/clear_failed_tasks/confirm", methods=["POST"])
     @has_access_view()
-    def _clear_failed_tasks(self):
+    def _clear_failed_tasks(self) -> Optional[Response]:
         """Execute the actual clearing of failed and upstream_failed tasks for a specific DAG after confirmation (admin version).
 
         This is the second step that performs the clearing operation.

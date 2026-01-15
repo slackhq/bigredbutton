@@ -28,12 +28,12 @@ from unittest.mock import Mock, MagicMock, patch
 
 # Mock airflow modules before importing big_red_button
 # This handles cases where airflow.www isn't available or Airflow models have changed
-sys.modules['airflow.www'] = MagicMock()
-sys.modules['airflow.www.extensions'] = MagicMock()
-sys.modules['airflow.www.extensions.init_auth_manager'] = MagicMock()
-sys.modules['airflow.www.auth'] = MagicMock()
+sys.modules["airflow.www"] = MagicMock()
+sys.modules["airflow.www.extensions"] = MagicMock()
+sys.modules["airflow.www.extensions.init_auth_manager"] = MagicMock()
+sys.modules["airflow.www.auth"] = MagicMock()
 
-from plugins.big_red_button.big_red_button import (
+from plugins.big_red_button.big_red_button import (  # noqa: E402
     handle_clearing,
     group_failures_by_dag,
     get_dag_ids,
@@ -54,11 +54,12 @@ def mock_session() -> Mock:
 @pytest.fixture
 def mock_task_instance() -> Callable:
     """Create a mock TaskInstance."""
+
     def _create_task_instance(
         dag_id: str = "test_dag",
         run_id: str = "test_run",
         task_id: str = "test_task",
-        state: str = "failed"
+        state: str = "failed",
     ) -> Mock:
         task = Mock()
         task.dag_id = dag_id
@@ -67,18 +68,19 @@ def mock_task_instance() -> Callable:
         task.state = state
         task.job_id = 1
         return task
+
     return _create_task_instance
 
 
 class TestGroupFailuresByDag:
     """Tests for group_failures_by_dag function."""
 
-    def test_empty_list(self):
+    def test_empty_list(self) -> None:
         """Test grouping an empty list of failures."""
         result = group_failures_by_dag([])
         assert result == {}
 
-    def test_single_dag(self, mock_task_instance):
+    def test_single_dag(self, mock_task_instance: Callable) -> None:
         """Test grouping failures from a single DAG."""
         task1 = mock_task_instance(dag_id="dag1", task_id="task1")
         task2 = mock_task_instance(dag_id="dag1", task_id="task2")
@@ -90,7 +92,7 @@ class TestGroupFailuresByDag:
         assert task1 in result["dag1"]
         assert task2 in result["dag1"]
 
-    def test_multiple_dags(self, mock_task_instance):
+    def test_multiple_dags(self, mock_task_instance: Callable) -> None:
         """Test grouping failures from multiple DAGs."""
         task1 = mock_task_instance(dag_id="dag1", task_id="task1")
         task2 = mock_task_instance(dag_id="dag2", task_id="task2")
@@ -102,7 +104,7 @@ class TestGroupFailuresByDag:
         assert len(result["dag1"]) == 2
         assert len(result["dag2"]) == 1
 
-    def test_preserves_task_order(self, mock_task_instance):
+    def test_preserves_task_order(self, mock_task_instance: Callable) -> None:
         """Test that grouping preserves the order of tasks within each DAG."""
         task1 = mock_task_instance(dag_id="dag1", task_id="task1")
         task2 = mock_task_instance(dag_id="dag1", task_id="task2")
@@ -118,7 +120,7 @@ class TestGroupFailuresByDag:
 class TestGetDagIds:
     """Tests for get_dag_ids function."""
 
-    def test_get_dag_ids_with_tags(self, mock_session):
+    def test_get_dag_ids_with_tags(self, mock_session: Mock) -> None:
         """Test getting DAG IDs filtered by tags."""
         mock_query = Mock()
         mock_query.filter.return_value = mock_query
@@ -131,7 +133,7 @@ class TestGetDagIds:
         assert result == ["dag1", "dag2", "dag3"]
         mock_session.query.assert_called_once()
 
-    def test_get_dag_ids_empty_result(self, mock_session):
+    def test_get_dag_ids_empty_result(self, mock_session: Mock) -> None:
         """Test getting DAG IDs when no DAGs match the tags."""
         mock_query = Mock()
         mock_query.filter.return_value = mock_query
@@ -143,7 +145,7 @@ class TestGetDagIds:
 
         assert result == []
 
-    def test_get_dag_ids_single_tag(self, mock_session):
+    def test_get_dag_ids_single_tag(self, mock_session: Mock) -> None:
         """Test getting DAG IDs with a single tag filter."""
         mock_query = Mock()
         mock_query.filter.return_value = mock_query
@@ -159,7 +161,7 @@ class TestGetDagIds:
 class TestGetDagTags:
     """Tests for get_dag_tags function."""
 
-    def test_get_dag_tags_no_filter(self, mock_session):
+    def test_get_dag_tags_no_filter(self, mock_session: Mock) -> None:
         """Test getting all DAG tags without a filter."""
         mock_query = Mock()
         mock_query.distinct.return_value = mock_query
@@ -174,7 +176,7 @@ class TestGetDagTags:
         assert result[1]["name"] == "tag2"
         assert result[2]["name"] == "tag3"
 
-    def test_get_dag_tags_with_filter(self, mock_session):
+    def test_get_dag_tags_with_filter(self, mock_session: Mock) -> None:
         """Test getting DAG tags with a selection filter."""
         mock_query = Mock()
         mock_query.distinct.return_value = mock_query
@@ -191,7 +193,7 @@ class TestGetDagTags:
         assert result[2]["name"] == "tag3"
         assert result[2]["selected"] is True
 
-    def test_get_dag_tags_empty_db(self, mock_session):
+    def test_get_dag_tags_empty_db(self, mock_session: Mock) -> None:
         """Test getting DAG tags when database has no tags."""
         mock_query = Mock()
         mock_query.distinct.return_value = mock_query
@@ -206,13 +208,17 @@ class TestGetDagTags:
 class TestGetRecentFailures:
     """Tests for get_recent_failures function."""
 
-    def test_get_recent_failures_combines_pages(self, mock_session, mock_task_instance):
+    def test_get_recent_failures_combines_pages(
+        self, mock_session: Mock, mock_task_instance: Callable
+    ) -> None:
         """Test that get_recent_failures correctly combines paged results."""
         time_cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
         tasks_page1 = [mock_task_instance(task_id=f"task{i}") for i in range(100)]
         tasks_page2 = [mock_task_instance(task_id=f"task{i}") for i in range(100, 150)]
 
-        with patch('plugins.big_red_button.big_red_button.get_recent_failures_paged') as mock_paged:
+        with patch(
+            "plugins.big_red_button.big_red_button.get_recent_failures_paged"
+        ) as mock_paged:
             mock_paged.return_value = [tasks_page1, tasks_page2]
 
             result = get_recent_failures(mock_session, time_cutoff)
@@ -220,12 +226,18 @@ class TestGetRecentFailures:
             assert len(result) == 150
             mock_paged.assert_called_once_with(mock_session, time_cutoff, None)
 
-    def test_get_recent_failures_with_dag_ids(self, mock_session, mock_task_instance):
+    def test_get_recent_failures_with_dag_ids(
+        self, mock_session: Mock, mock_task_instance: Callable
+    ) -> None:
         """Test that get_recent_failures passes dag_ids filter correctly."""
         time_cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
-        tasks = [mock_task_instance(dag_id="dag1", task_id=f"task{i}") for i in range(10)]
+        tasks = [
+            mock_task_instance(dag_id="dag1", task_id=f"task{i}") for i in range(10)
+        ]
 
-        with patch('plugins.big_red_button.big_red_button.get_recent_failures_paged') as mock_paged:
+        with patch(
+            "plugins.big_red_button.big_red_button.get_recent_failures_paged"
+        ) as mock_paged:
             mock_paged.return_value = [tasks]
 
             result = get_recent_failures(mock_session, time_cutoff, dag_ids=["dag1"])
@@ -233,11 +245,13 @@ class TestGetRecentFailures:
             assert len(result) == 10
             mock_paged.assert_called_once_with(mock_session, time_cutoff, ["dag1"])
 
-    def test_get_recent_failures_empty(self, mock_session):
+    def test_get_recent_failures_empty(self, mock_session: Mock) -> None:
         """Test get_recent_failures when no failures exist."""
         time_cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
 
-        with patch('plugins.big_red_button.big_red_button.get_recent_failures_paged') as mock_paged:
+        with patch(
+            "plugins.big_red_button.big_red_button.get_recent_failures_paged"
+        ) as mock_paged:
             mock_paged.return_value = []
 
             result = get_recent_failures(mock_session, time_cutoff)
@@ -248,9 +262,15 @@ class TestGetRecentFailures:
 class TestHandleClearing:
     """Tests for handle_clearing function."""
 
-    @patch('plugins.big_red_button.big_red_button.log_clearing')
-    @patch('plugins.big_red_button.big_red_button.clear_task_instances')
-    def test_clear_small_batch(self, mock_clear, mock_log, mock_session, mock_task_instance):
+    @patch("plugins.big_red_button.big_red_button.log_clearing")
+    @patch("plugins.big_red_button.big_red_button.clear_task_instances")
+    def test_clear_small_batch(
+        self,
+        mock_clear: Mock,
+        mock_log: Mock,
+        mock_session: Mock,
+        mock_task_instance: Callable,
+    ) -> None:
         """Test clearing a small batch of tasks (less than PAGE_SIZE)."""
         tasks = [mock_task_instance(task_id=f"task{i}") for i in range(50)]
 
@@ -259,9 +279,15 @@ class TestHandleClearing:
         mock_log.assert_called_once_with(50)
         mock_clear.assert_called_once_with(tasks, mock_session)
 
-    @patch('plugins.big_red_button.big_red_button.log_clearing')
-    @patch('plugins.big_red_button.big_red_button.clear_task_instances')
-    def test_clear_exact_page_size(self, mock_clear, mock_log, mock_session, mock_task_instance):
+    @patch("plugins.big_red_button.big_red_button.log_clearing")
+    @patch("plugins.big_red_button.big_red_button.clear_task_instances")
+    def test_clear_exact_page_size(
+        self,
+        mock_clear: Mock,
+        mock_log: Mock,
+        mock_session: Mock,
+        mock_task_instance: Callable,
+    ) -> None:
         """Test clearing exactly PAGE_SIZE tasks."""
         tasks = [mock_task_instance(task_id=f"task{i}") for i in range(PAGE_SIZE)]
 
@@ -270,9 +296,15 @@ class TestHandleClearing:
         mock_log.assert_called_once_with(PAGE_SIZE)
         mock_clear.assert_called_once_with(tasks, mock_session)
 
-    @patch('plugins.big_red_button.big_red_button.log_clearing')
-    @patch('plugins.big_red_button.big_red_button.clear_task_instances')
-    def test_clear_large_batch(self, mock_clear, mock_log, mock_session, mock_task_instance):
+    @patch("plugins.big_red_button.big_red_button.log_clearing")
+    @patch("plugins.big_red_button.big_red_button.clear_task_instances")
+    def test_clear_large_batch(
+        self,
+        mock_clear: Mock,
+        mock_log: Mock,
+        mock_session: Mock,
+        mock_task_instance: Callable,
+    ) -> None:
         """Test clearing a large batch of tasks that requires pagination."""
         tasks = [mock_task_instance(task_id=f"task{i}") for i in range(450)]
 
@@ -286,20 +318,28 @@ class TestHandleClearing:
         call_args = [call[0][0] for call in mock_clear.call_args_list]
         assert len(call_args[0]) == PAGE_SIZE  # First batch: 200
         assert len(call_args[1]) == PAGE_SIZE  # Second batch: 200
-        assert len(call_args[2]) == 50          # Third batch: 50
+        assert len(call_args[2]) == 50  # Third batch: 50
 
-    @patch('plugins.big_red_button.big_red_button.log_clearing')
-    @patch('plugins.big_red_button.big_red_button.clear_task_instances')
-    def test_clear_empty_list(self, mock_clear, mock_log, mock_session):
+    @patch("plugins.big_red_button.big_red_button.log_clearing")
+    @patch("plugins.big_red_button.big_red_button.clear_task_instances")
+    def test_clear_empty_list(
+        self, mock_clear: Mock, mock_log: Mock, mock_session: Mock
+    ) -> None:
         """Test clearing an empty list of tasks."""
         handle_clearing(mock_session, [])
 
         mock_log.assert_called_once_with(0)
         mock_clear.assert_not_called()
 
-    @patch('plugins.big_red_button.big_red_button.log_clearing')
-    @patch('plugins.big_red_button.big_red_button.clear_task_instances')
-    def test_clear_respects_page_boundaries(self, mock_clear, mock_log, mock_session, mock_task_instance):
+    @patch("plugins.big_red_button.big_red_button.log_clearing")
+    @patch("plugins.big_red_button.big_red_button.clear_task_instances")
+    def test_clear_respects_page_boundaries(
+        self,
+        mock_clear: Mock,
+        mock_log: Mock,
+        mock_session: Mock,
+        mock_task_instance: Callable,
+    ) -> None:
         """Test that clearing properly handles page boundaries."""
         tasks = [mock_task_instance(task_id=f"task{i}") for i in range(401)]
 
@@ -327,7 +367,7 @@ class TestLogClearing:
     as integration tests with a proper Flask app context.
     """
 
-    def test_log_clearing_integration_needed(self):
+    def test_log_clearing_integration_needed(self) -> None:
         """Placeholder test documenting that log_clearing needs integration tests."""
         # log_clearing accesses Flask's request object and Airflow's auth system
         # It should be tested in integration tests with:
@@ -340,21 +380,21 @@ class TestLogClearing:
 class TestClearWindows:
     """Tests for clear_windows constant."""
 
-    def test_clear_windows_defined(self):
+    def test_clear_windows_defined(self) -> None:
         """Test that all expected clear windows are defined."""
         assert "1_hour" in clear_windows
         assert "12_hours" in clear_windows
         assert "1_day" in clear_windows
         assert "7_days" in clear_windows
 
-    def test_clear_window_values(self):
+    def test_clear_window_values(self) -> None:
         """Test that clear windows have correct timedelta values."""
         assert clear_windows["1_hour"] == timedelta(hours=1)
         assert clear_windows["12_hours"] == timedelta(hours=12)
         assert clear_windows["1_day"] == timedelta(days=1)
         assert clear_windows["7_days"] == timedelta(days=7)
 
-    def test_clear_window_order(self):
+    def test_clear_window_order(self) -> None:
         """Test that clear windows are in ascending order of time."""
         windows_list = [
             clear_windows["1_hour"],
@@ -368,11 +408,11 @@ class TestClearWindows:
 class TestPageSize:
     """Tests for PAGE_SIZE constant."""
 
-    def test_page_size_value(self):
+    def test_page_size_value(self) -> None:
         """Test that PAGE_SIZE has the expected value."""
         assert PAGE_SIZE == 200
 
-    def test_page_size_positive(self):
+    def test_page_size_positive(self) -> None:
         """Test that PAGE_SIZE is a positive integer."""
         assert isinstance(PAGE_SIZE, int)
         assert PAGE_SIZE > 0
