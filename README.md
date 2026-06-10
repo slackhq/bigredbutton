@@ -22,6 +22,8 @@ The Big Red Button plugin provides a web interface and REST API for viewing and 
 
 ## Installation
 
+### Airflow 3.1+
+
 1. **Download the latest release:**
 
 ```bash
@@ -48,6 +50,15 @@ airflow webserver
 Navigate to your Airflow UI and look for:
 - **"Big Red Button"** in the Admin menu (tag-filtered view)
 - **"Big Red Button: Admin"** in the Admin menu (unrestricted view)
+
+### Airflow 2 (legacy)
+
+For Airflow 2.x installations, use the `2.10.2` tag:
+
+```bash
+curl -sL "https://github.com/slackhq/bigredbutton/archive/refs/tags/2.10.2.tar.gz" \
+  | tar -xz --strip-components=2 -C $AIRFLOW_HOME/plugins "bigredbutton-2.10.2/plugins/big_red_button"
+```
 
 ## Usage
 
