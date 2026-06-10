@@ -6,7 +6,7 @@
   color: var(--brb-text);
 }
 
-:root, [data-theme="light"] {
+.brb-container {
   --brb-text: #1a1a1a;
   --brb-text-muted: #555;
   --brb-bg: #fff;
@@ -29,7 +29,7 @@
   --brb-tag-clear-border: #dc3545;
 }
 
-[data-theme="dark"] {
+[data-theme="dark"] .brb-container {
   --brb-text: #e2e8f0;
   --brb-text-muted: #a0aec0;
   --brb-bg: #1a202c;
@@ -53,7 +53,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]) .brb-container {
     --brb-text: #e2e8f0;
     --brb-text-muted: #a0aec0;
     --brb-bg: #1a202c;
