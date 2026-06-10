@@ -22,17 +22,19 @@ The Big Red Button plugin provides a web interface and REST API for viewing and 
 
 ## Installation
 
-1. **Build the UI:**
+1. **Download the latest release:**
 
 ```bash
-make ui-setup
-make ui-build
+# Download from GitHub Releases
+curl -L https://github.com/slackhq/bigredbutton/releases/latest/download/big_red_button-<version>.tar.gz -o big_red_button.tar.gz
 ```
 
-2. **Copy the plugin to your Airflow plugins directory:**
+Or visit the [Releases page](https://github.com/slackhq/bigredbutton/releases) and download the latest `.tar.gz`.
+
+2. **Extract to your Airflow plugins directory:**
 
 ```bash
-cp -r plugins/big_red_button $AIRFLOW_HOME/plugins/
+tar -xzf big_red_button.tar.gz -C $AIRFLOW_HOME/plugins/
 ```
 
 3. **Restart your Airflow webserver:**
