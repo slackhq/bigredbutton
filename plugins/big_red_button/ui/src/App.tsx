@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   fetchFailures,
   fetchTags,
@@ -33,9 +33,9 @@ export function App() {
 
   const loadTags = useCallback(async () => {
     if (isAdmin) return;
-    const t = await fetchTags(selectedTags);
+    const t = await fetchTags();
     setTags(t);
-  }, [selectedTags, isAdmin]);
+  }, [isAdmin]);
 
   const loadFailures = useCallback(async () => {
     if (!isAdmin && selectedTags.length === 0) {
@@ -44,12 +44,16 @@ export function App() {
     }
     setLoading(true);
     try {
-      const data = await fetchFailures(clearWindow, isAdmin);
+      const data = await fetchFailures(
+        clearWindow,
+        isAdmin,
+        !isAdmin && selectedTags.length > 0 ? selectedTags : undefined
+      );
       setFailures(data);
     } finally {
       setLoading(false);
     }
-  }, [clearWindow, isAdmin]);
+  }, [clearWindow, isAdmin, selectedTags]);
 
   useEffect(() => {
     loadTags();
@@ -64,6 +68,7 @@ export function App() {
       {
         clear_window: clearWindow,
         dag_id: dagId,
+        tags_filter: !isAdmin && selectedTags.length > 0 ? selectedTags : undefined,
       },
       isAdmin
     );
@@ -76,6 +81,7 @@ export function App() {
     const result = await clearFailures(
       {
         clear_window: clearWindow,
+        tags_filter: !isAdmin && selectedTags.length > 0 ? selectedTags : undefined,
       },
       isAdmin
     );
@@ -84,12 +90,14 @@ export function App() {
     loadFailures();
   };
 
-  const toggleTag = (tagName: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tagName)
-        ? prev.filter((t) => t !== tagName)
-        : [...prev, tagName]
-    );
+  const addTag = (tagName: string) => {
+    if (!selectedTags.includes(tagName)) {
+      setSelectedTags((prev) => [...prev, tagName]);
+    }
+  };
+
+  const removeTag = (tagName: string) => {
+    setSelectedTags((prev) => prev.filter((t) => t !== tagName));
   };
 
   const canClearAll = failures != null && failures.total_failures > 0
@@ -126,25 +134,24 @@ export function App() {
         {!isAdmin && (
           <div className="brb-control-group">
             <label>Filter by tags: (required)</label>
-            <div className="brb-tags">
-              {tags.map((tag) => (
-                <button
-                  key={tag.name}
-                  className={`brb-tag ${selectedTags.includes(tag.name) ? "brb-tag-selected" : ""}`}
-                  onClick={() => toggleTag(tag.name)}
-                >
-                  {tag.name}
-                </button>
-              ))}
-              {selectedTags.length > 0 && (
-                <button
-                  className="brb-tag brb-tag-clear"
-                  onClick={() => setSelectedTags([])}
-                >
+            {selectedTags.length > 0 && (
+              <div className="brb-selected-tags">
+                {selectedTags.map((tag) => (
+                  <span key={tag} className="brb-selected-tag">
+                    {tag}
+                    <button onClick={() => removeTag(tag)} className="brb-selected-tag-remove">&times;</button>
+                  </span>
+                ))}
+                <button className="brb-tag brb-tag-clear" onClick={() => setSelectedTags([])}>
                   Clear all
                 </button>
-              )}
-            </div>
+              </div>
+            )}
+            <TagInput
+              allTags={tags.map((t) => t.name)}
+              selectedTags={selectedTags}
+              onSelect={addTag}
+            />
           </div>
         )}
 
@@ -225,6 +232,60 @@ export function App() {
           onConfirm={() => handleClearDag(confirmDag.dag_id)}
           onCancel={() => setConfirmDag(null)}
         />
+      )}
+    </div>
+  );
+}
+
+function TagInput({
+  allTags,
+  selectedTags,
+  onSelect,
+}: {
+  allTags: string[];
+  selectedTags: string[];
+  onSelect: (tag: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const filtered = allTags.filter(
+    (t) => !selectedTags.includes(t) && t.toLowerCase().includes(query.toLowerCase())
+  );
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div className="brb-tag-input-wrapper" ref={wrapperRef}>
+      <input
+        type="text"
+        className="brb-tag-input"
+        placeholder="Type to search tags..."
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+      />
+      {open && filtered.length > 0 && (
+        <div className="brb-tag-dropdown">
+          {filtered.map((tag) => (
+            <button
+              key={tag}
+              className="brb-tag-option"
+              onClick={() => { onSelect(tag); setQuery(""); setOpen(false); }}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
