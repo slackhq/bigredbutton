@@ -26,12 +26,18 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable
 from unittest.mock import Mock, MagicMock, patch
 
-# Mock airflow modules before importing big_red_button
-# This handles cases where airflow.www isn't available or Airflow models have changed
-sys.modules["airflow.www"] = MagicMock()
-sys.modules["airflow.www.extensions"] = MagicMock()
-sys.modules["airflow.www.extensions.init_auth_manager"] = MagicMock()
-sys.modules["airflow.www.auth"] = MagicMock()
+# Mock airflow and fastapi modules before importing big_red_button so tests
+# can run without a full Airflow 3 installation
+for _key in [k for k in sys.modules if k.startswith("airflow") or k.startswith("fastapi")]:
+    del sys.modules[_key]
+sys.modules["airflow"] = MagicMock()
+sys.modules["airflow.models"] = MagicMock()
+sys.modules["airflow.plugins_manager"] = MagicMock()
+sys.modules["airflow.utils"] = MagicMock()
+sys.modules["airflow.utils.session"] = MagicMock()
+sys.modules["fastapi"] = MagicMock()
+sys.modules["fastapi.staticfiles"] = MagicMock()
+sys.modules["pydantic"] = MagicMock()
 
 from plugins.big_red_button.big_red_button import (  # noqa: E402
     handle_clearing,
@@ -66,7 +72,6 @@ def mock_task_instance() -> Callable:
         task.run_id = run_id
         task.task_id = task_id
         task.state = state
-        task.job_id = 1
         return task
 
     return _create_task_instance
