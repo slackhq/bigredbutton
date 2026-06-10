@@ -193,7 +193,7 @@ export function App() {
               failures.dags.map((dag) => (
                 <tr key={dag.dag_id}>
                   <td>
-                    <a href={`/dags/${dag.dag_id}/grid`} className="brb-dag-link">
+                    <a href={`/dags/${dag.dag_id}`} className="brb-dag-link">
                       {dag.dag_id}
                     </a>
                   </td>
