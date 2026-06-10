@@ -7,7 +7,7 @@ import {
   type TagInfo,
   type DagFailureSummary,
 } from "./api";
-import styles from "./styles.css?inline";
+import "./styles.css";
 
 const CLEAR_WINDOWS = [
   { key: "1_hour", label: "1 Hour" },
@@ -21,13 +21,6 @@ function useIsAdmin(): boolean {
 }
 
 export function App() {
-  useEffect(() => {
-    const style = document.createElement("style");
-    style.textContent = styles;
-    document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
-  }, []);
-
   const isAdmin = useIsAdmin();
   const [clearWindow, setClearWindow] = useState("1_hour");
   const [tags, setTags] = useState<TagInfo[]>([]);
