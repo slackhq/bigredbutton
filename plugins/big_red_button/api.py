@@ -112,7 +112,9 @@ def get_failures(
     dag_id: Optional[str] = Query(default=None),
 ):
     if clear_window not in clear_windows:
-        raise HTTPException(status_code=400, detail=f"Invalid clear_window: {clear_window}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid clear_window: {clear_window}"
+        )
 
     time_cutoff = datetime.now(timezone.utc) - clear_windows[clear_window]
 
@@ -124,7 +126,9 @@ def get_failures(
             if not dag_ids:
                 return FailuresResponse(total_failures=0, dags=[])
 
-        recent_failures = get_recent_failures(session, time_cutoff=time_cutoff, dag_ids=dag_ids)
+        recent_failures = get_recent_failures(
+            session, time_cutoff=time_cutoff, dag_ids=dag_ids
+        )
         failures_by_dag = group_failures_by_dag(recent_failures)
         return _build_failures_response(failures_by_dag)
 
@@ -139,7 +143,9 @@ def get_tags(selected: Optional[list[str]] = Query(default=None)):
 @app.post("/api/clear", response_model=ClearResponse)
 def clear_failures(req: ClearRequest):
     if req.clear_window not in clear_windows:
-        raise HTTPException(status_code=400, detail=f"Invalid clear_window: {req.clear_window}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid clear_window: {req.clear_window}"
+        )
 
     if not req.tags_filter and not req.dag_id:
         raise HTTPException(
@@ -157,7 +163,9 @@ def clear_failures(req: ClearRequest):
             if not dag_ids:
                 return ClearResponse(cleared_count=0)
 
-        recent_failures = get_recent_failures(session, time_cutoff=time_cutoff, dag_ids=dag_ids)
+        recent_failures = get_recent_failures(
+            session, time_cutoff=time_cutoff, dag_ids=dag_ids
+        )
         handle_clearing(session, recent_failures)
 
         log_clearing(
@@ -185,7 +193,9 @@ def get_failures_admin(
     dag_id: Optional[str] = Query(default=None),
 ):
     if clear_window not in clear_windows:
-        raise HTTPException(status_code=400, detail=f"Invalid clear_window: {clear_window}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid clear_window: {clear_window}"
+        )
 
     time_cutoff = datetime.now(timezone.utc) - clear_windows[clear_window]
 
@@ -198,7 +208,9 @@ def get_failures_admin(
             if not dag_ids:
                 return FailuresResponse(total_failures=0, dags=[])
 
-        recent_failures = get_recent_failures(session, time_cutoff=time_cutoff, dag_ids=dag_ids)
+        recent_failures = get_recent_failures(
+            session, time_cutoff=time_cutoff, dag_ids=dag_ids
+        )
         failures_by_dag = group_failures_by_dag(recent_failures)
         return _build_failures_response(failures_by_dag)
 
@@ -206,7 +218,9 @@ def get_failures_admin(
 @app.post("/api/admin/clear", response_model=ClearResponse)
 def clear_failures_admin(req: ClearRequest):
     if req.clear_window not in clear_windows:
-        raise HTTPException(status_code=400, detail=f"Invalid clear_window: {req.clear_window}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid clear_window: {req.clear_window}"
+        )
 
     time_cutoff = datetime.now(timezone.utc) - clear_windows[req.clear_window]
 
@@ -219,7 +233,9 @@ def clear_failures_admin(req: ClearRequest):
             if not dag_ids:
                 return ClearResponse(cleared_count=0)
 
-        recent_failures = get_recent_failures(session, time_cutoff=time_cutoff, dag_ids=dag_ids)
+        recent_failures = get_recent_failures(
+            session, time_cutoff=time_cutoff, dag_ids=dag_ids
+        )
         handle_clearing(session, recent_failures)
 
         log_clearing(

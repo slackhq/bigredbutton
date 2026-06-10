@@ -229,6 +229,7 @@ def get_dag_tags(
 
 def _get_fastapi_app():
     from plugins.big_red_button.api import app
+
     return app
 
 

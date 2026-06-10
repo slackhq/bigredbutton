@@ -28,7 +28,9 @@ from unittest.mock import Mock, MagicMock, patch
 
 # Mock airflow and fastapi modules before importing big_red_button so tests
 # can run without a full Airflow 3 installation
-for _key in [k for k in sys.modules if k.startswith("airflow") or k.startswith("fastapi")]:
+for _key in [
+    k for k in sys.modules if k.startswith("airflow") or k.startswith("fastapi")
+]:
     del sys.modules[_key]
 sys.modules["airflow"] = MagicMock()
 sys.modules["airflow.models"] = MagicMock()
