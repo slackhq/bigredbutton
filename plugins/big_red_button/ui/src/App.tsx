@@ -32,9 +32,10 @@ export function App() {
   const [message, setMessage] = useState<string | null>(null);
 
   const loadTags = useCallback(async () => {
+    if (isAdmin) return;
     const t = await fetchTags(selectedTags);
     setTags(t);
-  }, [selectedTags]);
+  }, [selectedTags, isAdmin]);
 
   const loadFailures = useCallback(async () => {
     if (!isAdmin && selectedTags.length === 0) {
@@ -43,16 +44,12 @@ export function App() {
     }
     setLoading(true);
     try {
-      const data = await fetchFailures(
-        clearWindow,
-        isAdmin,
-        selectedTags.length > 0 ? selectedTags : undefined
-      );
+      const data = await fetchFailures(clearWindow, isAdmin);
       setFailures(data);
     } finally {
       setLoading(false);
     }
-  }, [clearWindow, selectedTags, isAdmin]);
+  }, [clearWindow, isAdmin]);
 
   useEffect(() => {
     loadTags();
@@ -67,7 +64,6 @@ export function App() {
       {
         clear_window: clearWindow,
         dag_id: dagId,
-        tags_filter: selectedTags.length > 0 ? selectedTags : undefined,
       },
       isAdmin
     );
@@ -80,7 +76,6 @@ export function App() {
     const result = await clearFailures(
       {
         clear_window: clearWindow,
-        tags_filter: selectedTags.length > 0 ? selectedTags : undefined,
       },
       isAdmin
     );
@@ -97,9 +92,8 @@ export function App() {
     );
   };
 
-  const canClearAll = isAdmin
-    ? failures != null && failures.total_failures > 0
-    : selectedTags.length > 0 && failures != null && failures.total_failures > 0;
+  const canClearAll = failures != null && failures.total_failures > 0
+    && (isAdmin || selectedTags.length > 0);
 
   return (
     <div className="brb-container">
@@ -129,28 +123,30 @@ export function App() {
           </div>
         </div>
 
-        <div className="brb-control-group">
-          <label>Filter by tags:{!isAdmin && " (required)"}</label>
-          <div className="brb-tags">
-            {tags.map((tag) => (
-              <button
-                key={tag.name}
-                className={`brb-tag ${selectedTags.includes(tag.name) ? "brb-tag-selected" : ""}`}
-                onClick={() => toggleTag(tag.name)}
-              >
-                {tag.name}
-              </button>
-            ))}
-            {selectedTags.length > 0 && (
-              <button
-                className="brb-tag brb-tag-clear"
-                onClick={() => setSelectedTags([])}
-              >
-                Clear all
-              </button>
-            )}
+        {!isAdmin && (
+          <div className="brb-control-group">
+            <label>Filter by tags: (required)</label>
+            <div className="brb-tags">
+              {tags.map((tag) => (
+                <button
+                  key={tag.name}
+                  className={`brb-tag ${selectedTags.includes(tag.name) ? "brb-tag-selected" : ""}`}
+                  onClick={() => toggleTag(tag.name)}
+                >
+                  {tag.name}
+                </button>
+              ))}
+              {selectedTags.length > 0 && (
+                <button
+                  className="brb-tag brb-tag-clear"
+                  onClick={() => setSelectedTags([])}
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         <button
           className="brb-btn brb-btn-danger"
