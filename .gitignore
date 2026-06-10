@@ -23,6 +23,10 @@ htmlcov/
 *.swo
 *~
 
+# UI build artifacts
+plugins/big_red_button/ui/node_modules/
+plugins/big_red_button/static/
+
 # OS
 .DS_Store
 Thumbs.db

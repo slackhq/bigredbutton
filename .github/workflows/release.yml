@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: plugins/big_red_button/ui/package-lock.json
+
+      - name: Build UI
+        run: |
+          make ui-setup
+          make ui-build
+
+      - name: Package plugin
+        run: |
+          mkdir -p dist
+          cp -r plugins/big_red_button dist/big_red_button
+          rm -rf dist/big_red_button/ui
+          tar -czf dist/big_red_button-${{ github.ref_name }}.tar.gz -C dist big_red_button
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/big_red_button-${{ github.ref_name }}.tar.gz
+          generate_release_notes: true

@@ -10,7 +10,7 @@ The intent and goal of open sourcing this project is to increase the contributor
 
 # Getting started
 
-Please see [Installation](https://github.com/slackhq/bigredbutton/tree/add_plugin?tab=readme-ov-file#-installation) and [Development Setup](https://github.com/slackhq/bigredbutton/tree/add_plugin?tab=readme-ov-file#-development-setup).
+Please see [Installation](https://github.com/slackhq/bigredbutton#installation) and [Development Setup](https://github.com/slackhq/bigredbutton#development-setup).
 
 # Issues, requests & ideas
 

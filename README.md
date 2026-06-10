@@ -1,106 +1,127 @@
-# 🔴 Big Red Button
+# Big Red Button
 
-> A powerful Airflow plugin for clearing recently failed task instances with only a few clicks
+> An Airflow plugin for clearing recently failed task instances with only a few clicks
 
-The Big Red Button plugin provides a convenient web interface for viewing and clearing recently failed task instances across your Airflow DAGs. Perfect for those moments when you need to quickly recover from cascading failures or retry multiple tasks at once.
+The Big Red Button plugin provides a web interface and REST API for viewing and clearing recently failed task instances across your Airflow DAGs. Perfect for those moments when you need to quickly recover from cascading failures or retry multiple tasks at once.
 
-## ✨ Features
+## Features
 
-### 🎯 **Bulk Clearing**
-Clear all recently failed and upstream-failed task instances across multiple DAGs with a single click. No more manually clicking through individual task instances.
+- **Bulk Clearing** — Clear all recently failed and upstream-failed task instances across multiple DAGs with a single click
+- **Tag-Based Filtering** — Filter DAGs by tags to selectively clear failures for specific groups of workflows
+- **Time Window Selection** — Choose from 1 hour, 12 hours, 1 day, or 7 days
+- **Two-Step Confirmation** — Every clearing operation requires explicit confirmation
+- **Audit Logging** — All clearing operations are logged to Airflow's audit log
+- **REST API** — Programmatic access for automation and integrations
+- **RBAC Integration** — Separate user and admin views controlled by Airflow's role-based access
 
-### 🏷️ **Tag-Based Filtering**
-Filter DAGs by tags to selectively clear failures for specific groups of workflows. Great for managing different environments or teams.
+## Requirements
 
-### ⏰ **Time Window Selection**
-Choose from multiple time windows to clear failures:
-- **1 hour** - Recent failures only
-- **12 hours** - Half-day failures
-- **1 day** - Daily failures
-- **7 days** - Weekly failures
+- Apache Airflow 3.1+
+- Python 3.9+
+- Node.js 18+ (for building the UI)
 
-### 📊 **Failure Overview**
-View failure counts grouped by DAG before clearing. Know exactly what you're about to clear with a confirmation page showing all affected tasks.
+## Installation
 
-### 🔐 **Two-Step Confirmation**
-Safety first! Every clearing operation requires explicit confirmation, preventing accidental mass deletions.
+### Airflow 3.1+
 
-### 📝 **Audit Logging**
-All clearing operations are logged to Airflow's audit log with details about who cleared what and when.
-
-## 📦 Installation
-
-### Requirements
-- Apache Airflow 2.0+ (not currently tested for Airflow 3.0+)
-- Python 3.8-3.11
-
-### Steps
-
-1. **Copy the plugin to your Airflow plugins directory:**
+1. **Download the latest release:**
 
 ```bash
-# Copy the entire big_red_button folder to your Airflow plugins directory
-cp -r plugins/big_red_button $AIRFLOW_HOME/plugins/
+# Download from GitHub Releases
+curl -L https://github.com/slackhq/bigredbutton/releases/latest/download/big_red_button-<version>.tar.gz -o big_red_button.tar.gz
 ```
 
-2. **Restart your Airflow webserver:**
+Or visit the [Releases page](https://github.com/slackhq/bigredbutton/releases) and download the latest `.tar.gz`.
+
+2. **Extract to your Airflow plugins directory:**
 
 ```bash
-# Restart the webserver to load the plugin
+tar -xzf big_red_button.tar.gz -C $AIRFLOW_HOME/plugins/
+```
+
+3. **Restart your Airflow webserver:**
+
+```bash
 airflow webserver
 ```
 
-3. **Access the plugin:**
+4. **Access the plugin:**
 
 Navigate to your Airflow UI and look for:
-- **"Big Red Button"** in the main menu (tag-filtered view)
-- **"Big Red Button Admin"** in the main menu (admin view for all DAGs)
+- **"Big Red Button"** in the Admin menu (tag-filtered view)
+- **"Big Red Button: Admin"** in the Admin menu (unrestricted view)
 
-## 🚀 Usage
+### Airflow 2 (legacy)
 
-### Tag-Filtered View
+For Airflow 2.x installations, use the `2.10.2` tag:
+
+```bash
+curl -sL "https://github.com/slackhq/bigredbutton/archive/refs/tags/2.10.2.tar.gz" \
+  | tar -xz --strip-components=2 -C $AIRFLOW_HOME/plugins "bigredbutton-2.10.2/plugins/big_red_button"
+```
+
+## Usage
+
+### User View (Tag-Filtered)
 
 1. Navigate to **"Big Red Button"** in the Airflow UI
-2. Select tags to filter DAGs
-3. Choose a time window (1 hour, 12 hours, 1 day, or 7 days)
-4. Click **"Clear Failed DAGs"**
-5. Review the confirmation page showing all affected tasks
-6. Click **"Confirm Clear"** to execute the clearing operation
+2. Select one or more tags (required)
+3. Choose a time window
+4. View failure counts grouped by DAG
+5. Click **"Clear"** on a specific DAG or **"Clear All Failed DAGs"**
+6. Confirm the operation
 
-### Admin View (All DAGs)
+**Route:** `/big-red-button`
 
-1. Navigate to **"Big Red Button Admin"** in the Airflow UI
-2. Choose a time window (1 hour, 12 hours, 1 day, or 7 days)
-3. View failure counts for **all** DAGs
-4. Click **"Clear All Failed DAGs"** to proceed
-5. Review and confirm the clearing operation
+### Admin View
 
-### Clear by Individual DAG
+1. Navigate to **"Big Red Button: Admin"** in the Airflow UI
+2. Choose a time window
+3. View all failures across all DAGs (tags are optional filters)
+4. Clear individual DAGs or all failures at once
 
-From either view:
-1. Find the DAG with failures in the failure count table
-2. Click **"Clear"** next to the specific DAG
-3. Review the task-level details
-4. Confirm to clear only that DAG's failures
+**Route:** `/big-red-button-admin`
 
-## 🎨 Views
+Access to the admin view should be restricted via Airflow's RBAC configuration.
 
-### Big Red Button (Tag-Filtered)
-Perfect for teams managing multiple DAG groups. Filter by tags to see only the failures relevant to your team or environment.
+## REST API
 
-**Route:** `/bigredbuttonbaseview`
+All endpoints are mounted under `/big-red-button`.
 
-### Big Red Button Admin
-Full administrative view showing failures across all DAGs without filtering. Ideal for platform administrators who need visibility into the entire Airflow instance.
+### User Endpoints
 
-**Route:** `/bigredbuttonadminbaseview`
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/failures?clear_window=1_hour&tags=my_tag` | Get failures (tags required) |
+| GET | `/api/tags` | List all DAG tags |
+| POST | `/api/clear` | Clear failures (tags or dag_id required) |
 
-## 🔧 Configuration
+### Admin Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/failures?clear_window=1_hour` | Get all failures (tags optional) |
+| POST | `/api/admin/clear` | Clear failures (no restrictions) |
+
+### Request/Response Examples
+
+**Get failures:**
+```bash
+curl "http://localhost:8080/big-red-button/api/admin/failures?clear_window=1_hour"
+```
+
+**Clear failures:**
+```bash
+curl -X POST "http://localhost:8080/big-red-button/api/clear" \
+  -H "Content-Type: application/json" \
+  -d '{"clear_window": "1_hour", "tags_filter": ["my_team"]}'
+```
+
+## Configuration
 
 The plugin uses the following default settings (defined in `big_red_button.py`):
 
 ```python
-# Time windows for clearing failures
 clear_windows = {
     "1_hour": timedelta(hours=1),
     "12_hours": timedelta(hours=12),
@@ -108,118 +129,77 @@ clear_windows = {
     "7_days": timedelta(days=7),
 }
 
-# Number of tasks to clear per database query
-PAGE_SIZE = 200
+PAGE_SIZE = 200  # Tasks cleared per batch
 ```
 
-These can be modified by editing the source file if needed.
-
-## 🛡️ Safety Features
-
-- **Two-step confirmation:** Always shows what will be cleared before executing
-- **Audit logging:** Every clearing operation is logged with user info
-- **Paginated clearing:** Large batches are cleared in chunks to avoid database timeouts
-- **Read-only preview:** Confirmation page doesn't execute any changes
-
-## 🧪 Development Setup
+## Development Setup
 
 ### Prerequisites
-- Python 3.8-3.11 (Airflow 2.x is not compatible with Python 3.12+)
+- Python 3.9+
+- Node.js 18+
 
 ### Quick Start
 
 ```bash
-# Setup virtual environment and install dependencies
+# Python setup
 make setup
+
+# UI setup and build
+make ui-setup
+make ui-build
 
 # Run tests
 make test
 
-# Format code
-make format
-
-# Run tests with verbose output
-make test-verbose
-
-# Run tests with coverage
-make test-coverage
-
-# Clean up
-make clean
+# Start UI dev server (hot reload, proxies to Airflow)
+make ui-dev
 ```
 
-### Manual Setup
+### Available Make Targets
 
-1. Create a virtual environment:
-```bash
-python3 -m venv venv
-```
+| Target | Description |
+|--------|-------------|
+| `make setup` | Create venv and install Python dependencies |
+| `make test` | Run tests |
+| `make test-verbose` | Run tests with verbose output |
+| `make test-coverage` | Run tests with coverage report |
+| `make lint` | Run ruff linter |
+| `make lint-fix` | Auto-fix lint issues |
+| `make format` | Format code with ruff |
+| `make ui-setup` | Install UI dependencies |
+| `make ui-build` | Build UI bundle for production |
+| `make ui-dev` | Start UI dev server with hot reload |
+| `make clean` | Remove venv, node_modules, and build artifacts |
 
-2. Activate the virtual environment:
-```bash
-source venv/bin/activate  # On macOS/Linux
-# or
-venv\Scripts\activate  # On Windows
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements-dev.txt
-```
-
-### Running Tests
-
-With the virtual environment activated:
-```bash
-pytest tests/ -v
-```
-
-Or run all tests:
-```bash
-pytest
-```
-
-To run tests with coverage:
-```bash
-pytest tests/ --cov=plugins/big_red_button --cov-report=term-missing
-```
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 bigredbutton/
 ├── plugins/
 │   └── big_red_button/
-│       ├── big_red_button.py    # Main plugin code
-│       └── templates/           # Flask templates
-│           ├── big_red_button.html
-│           ├── big_red_button_admin.html
-│           └── clear_failed.html
+│       ├── big_red_button.py    # Core backend logic and plugin registration
+│       ├── api.py               # FastAPI REST API
+│       ├── static/              # Built UI bundle (generated by ui-build)
+│       └── ui/                  # React frontend source
+│           ├── src/
+│           │   ├── main.tsx
+│           │   ├── App.tsx
+│           │   ├── api.ts
+│           │   └── styles.css
+│           ├── package.json
+│           └── vite.config.ts
 ├── tests/
-│   ├── __init__.py
-│   ├── conftest.py              # Pytest configuration
-│   └── test_big_red_button.py   # Unit tests
-├── requirements.txt             # Runtime dependencies
-├── requirements-dev.txt         # Development dependencies
-├── Makefile                     # Development commands
-└── README.md
+│   ├── conftest.py
+│   └── test_big_red_button.py
+├── requirements.txt
+├── requirements-dev.txt
+└── Makefile
 ```
 
-## 🧩 How It Works
+## How It Works
 
-The plugin integrates with Airflow's task clearing mechanism:
-
-1. **Query:** Finds all failed and upstream-failed task instances within the specified time window
+1. **Query:** Finds all failed and upstream-failed task instances within the specified time window using `TaskInstance.last_heartbeat_at`
 2. **Filter:** Optionally filters by DAG tags or specific DAG ID
-3. **Group:** Groups failures by DAG for easy visualization
-4. **Clear:** Uses Airflow's built-in `clear_task_instances()` function in batches
+3. **Group:** Groups failures by DAG for visualization
+4. **Clear:** Uses Airflow's built-in `clear_task_instances()` in batches
 5. **Log:** Records the operation to Airflow's audit log
-
-
-## 🙏 Acknowledgments
-
-Originally developed for managing task failures at scale in production Airflow environments.
-
----
-
-**Need to clear those failed tasks?** The Big Red Button is here to help! 🚀
