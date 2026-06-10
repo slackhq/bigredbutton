@@ -6,10 +6,15 @@ export default defineConfig({
   build: {
     outDir: "../static",
     emptyOutDir: true,
+    cssCodeSplit: false,
+    lib: {
+      entry: "src/main.tsx",
+      formats: ["es"],
+      fileName: () => "big-red-button.js",
+    },
     rollupOptions: {
       output: {
-        entryFileNames: "big-red-button.js",
-        assetFileNames: "big-red-button.[ext]",
+        assetFileNames: "big-red-button[extname]",
       },
     },
   },

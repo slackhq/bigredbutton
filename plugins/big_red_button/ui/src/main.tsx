@@ -1,12 +1,6 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
 import { App } from "./App";
 
-const root = document.getElementById("big-red-button-root");
-if (root) {
-  ReactDOM.createRoot(root).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  );
-}
+// Airflow's ReactPlugin loader expects a component at globalThis.AirflowPlugin
+(globalThis as Record<string, unknown>).AirflowPlugin = App;
+
+export default App;
