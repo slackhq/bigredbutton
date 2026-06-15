@@ -119,6 +119,14 @@ curl -X POST "http://localhost:8080/big-red-button/api/clear" \
 
 ## Configuration
 
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BRB_AUTH_ENABLED` | `true` | Enable JWT-based authentication on API endpoints. Set to `false` for deployments where Airflow runs behind an external auth proxy (e.g., with `no_auth` auth manager). |
+
+### Time Windows
+
 The plugin uses the following default settings (defined in `big_red_button.py`):
 
 ```python
