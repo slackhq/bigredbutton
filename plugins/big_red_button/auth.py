@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
@@ -26,9 +27,23 @@ from airflow.api_fastapi.auth.managers.models.resource_details import (
     DagDetails,
 )
 
+AUTH_ENABLED = os.environ.get("BRB_AUTH_ENABLED", "true").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
+
+class _AnonymousUser:
+    username = "anonymous"
+    name = "Anonymous"
+
 
 async def get_user(request: Request) -> BaseUser:
     """Resolve the authenticated user from JWT token (cookie or Authorization header)."""
+    if not AUTH_ENABLED:
+        return _AnonymousUser()
+
     user: BaseUser | None = getattr(request.state, "user", None)
     if user:
         return user
@@ -62,6 +77,9 @@ GetUserDep = Annotated[BaseUser, Depends(get_user)]
 
 def requires_dag_edit(user: GetUserDep) -> BaseUser:
     """Require permission to edit DAG task instances (admin-level clear operations)."""
+    if not AUTH_ENABLED:
+        return user
+
     auth_manager = get_auth_manager()
     if not auth_manager.is_authorized_dag(
         method="PUT",
