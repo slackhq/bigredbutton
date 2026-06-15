@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from airflow.utils.session import create_session
 
+from plugins.big_red_button.auth import GetUserDep, RequiresDagEditDep
 from plugins.big_red_button.big_red_button import (
     clear_windows,
     get_dag_ids,
@@ -68,8 +69,6 @@ class ClearRequest(BaseModel):
     clear_window: str
     dag_id: Optional[str] = None
     tags_filter: Optional[list[str]] = None
-    user: str = "anonymous"
-    user_display: str = ""
 
 
 class ClearResponse(BaseModel):
@@ -106,7 +105,8 @@ def _build_failures_response(failures_by_dag: dict) -> FailuresResponse:
 
 
 @app.get("/api/failures", response_model=FailuresResponse)
-def get_failures(
+async def get_failures(
+    user: GetUserDep,
     clear_window: str = Query(default="1_hour", enum=list(clear_windows.keys())),
     tags: list[str] = Query(..., min_length=1),
     dag_id: Optional[str] = Query(default=None),
@@ -134,14 +134,16 @@ def get_failures(
 
 
 @app.get("/api/tags", response_model=list[TagInfo])
-def get_tags(selected: Optional[list[str]] = Query(default=None)):
+async def get_tags(
+    user: GetUserDep, selected: Optional[list[str]] = Query(default=None)
+):
     with create_session() as session:
         tags = get_dag_tags(session, selected)
         return [TagInfo(**t) for t in tags]
 
 
 @app.post("/api/clear", response_model=ClearResponse)
-def clear_failures(req: ClearRequest):
+async def clear_failures(req: ClearRequest, user: GetUserDep):
     if req.clear_window not in clear_windows:
         raise HTTPException(
             status_code=400, detail=f"Invalid clear_window: {req.clear_window}"
@@ -173,8 +175,8 @@ def clear_failures(req: ClearRequest):
             clear_window=req.clear_window,
             dag_id=req.dag_id,
             tags_filter=req.tags_filter,
-            user=req.user,
-            user_display=req.user_display,
+            user=getattr(user, "username", "unknown"),
+            user_display=getattr(user, "name", ""),
         )
 
         return ClearResponse(cleared_count=len(recent_failures))
@@ -187,7 +189,8 @@ def clear_failures(req: ClearRequest):
 
 
 @app.get("/api/admin/failures", response_model=FailuresResponse)
-def get_failures_admin(
+async def get_failures_admin(
+    user: RequiresDagEditDep,
     clear_window: str = Query(default="1_hour", enum=list(clear_windows.keys())),
     tags: Optional[list[str]] = Query(default=None),
     dag_id: Optional[str] = Query(default=None),
@@ -216,7 +219,7 @@ def get_failures_admin(
 
 
 @app.post("/api/admin/clear", response_model=ClearResponse)
-def clear_failures_admin(req: ClearRequest):
+async def clear_failures_admin(req: ClearRequest, user: RequiresDagEditDep):
     if req.clear_window not in clear_windows:
         raise HTTPException(
             status_code=400, detail=f"Invalid clear_window: {req.clear_window}"
@@ -243,8 +246,8 @@ def clear_failures_admin(req: ClearRequest):
             clear_window=req.clear_window,
             dag_id=req.dag_id,
             tags_filter=req.tags_filter,
-            user=req.user,
-            user_display=req.user_display,
+            user=getattr(user, "username", "unknown"),
+            user_display=getattr(user, "name", ""),
         )
 
         return ClearResponse(cleared_count=len(recent_failures))

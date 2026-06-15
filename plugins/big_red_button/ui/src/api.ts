@@ -28,8 +28,6 @@ export interface ClearRequest {
   clear_window: string;
   dag_id?: string;
   tags_filter?: string[];
-  user?: string;
-  user_display?: string;
 }
 
 export interface ClearResponse {
