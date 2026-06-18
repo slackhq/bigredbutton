@@ -278,12 +278,10 @@ class TestGetRecentFailures:
 class TestHandleClearing:
     """Tests for handle_clearing function."""
 
-    @patch("plugins.big_red_button.big_red_button.log_clearing")
     @patch("plugins.big_red_button.big_red_button.clear_task_instances")
     def test_clear_small_batch(
         self,
         mock_clear: Mock,
-        mock_log: Mock,
         mock_session: Mock,
         mock_task_instance: Callable,
     ) -> None:
@@ -292,15 +290,12 @@ class TestHandleClearing:
 
         handle_clearing(mock_session, tasks)
 
-        mock_log.assert_called_once_with(50)
         mock_clear.assert_called_once_with(tasks, mock_session)
 
-    @patch("plugins.big_red_button.big_red_button.log_clearing")
     @patch("plugins.big_red_button.big_red_button.clear_task_instances")
     def test_clear_exact_page_size(
         self,
         mock_clear: Mock,
-        mock_log: Mock,
         mock_session: Mock,
         mock_task_instance: Callable,
     ) -> None:
@@ -309,15 +304,12 @@ class TestHandleClearing:
 
         handle_clearing(mock_session, tasks)
 
-        mock_log.assert_called_once_with(PAGE_SIZE)
         mock_clear.assert_called_once_with(tasks, mock_session)
 
-    @patch("plugins.big_red_button.big_red_button.log_clearing")
     @patch("plugins.big_red_button.big_red_button.clear_task_instances")
     def test_clear_large_batch(
         self,
         mock_clear: Mock,
-        mock_log: Mock,
         mock_session: Mock,
         mock_task_instance: Callable,
     ) -> None:
@@ -326,7 +318,6 @@ class TestHandleClearing:
 
         handle_clearing(mock_session, tasks)
 
-        mock_log.assert_called_once_with(450)
         # Should be called 3 times: 200 + 200 + 50
         assert mock_clear.call_count == 3
 
@@ -336,23 +327,17 @@ class TestHandleClearing:
         assert len(call_args[1]) == PAGE_SIZE  # Second batch: 200
         assert len(call_args[2]) == 50  # Third batch: 50
 
-    @patch("plugins.big_red_button.big_red_button.log_clearing")
     @patch("plugins.big_red_button.big_red_button.clear_task_instances")
-    def test_clear_empty_list(
-        self, mock_clear: Mock, mock_log: Mock, mock_session: Mock
-    ) -> None:
+    def test_clear_empty_list(self, mock_clear: Mock, mock_session: Mock) -> None:
         """Test clearing an empty list of tasks."""
         handle_clearing(mock_session, [])
 
-        mock_log.assert_called_once_with(0)
         mock_clear.assert_not_called()
 
-    @patch("plugins.big_red_button.big_red_button.log_clearing")
     @patch("plugins.big_red_button.big_red_button.clear_task_instances")
     def test_clear_respects_page_boundaries(
         self,
         mock_clear: Mock,
-        mock_log: Mock,
         mock_session: Mock,
         mock_task_instance: Callable,
     ) -> None:

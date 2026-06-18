@@ -35,14 +35,12 @@ clear_windows = {
 
 
 def handle_clearing(session: Session, recent_failures: List[TaskInstance]) -> None:
-    """Clear failed task instances in batches and log the operation.
+    """Clear failed task instances in batches.
 
     Args:
         session: SQLAlchemy database session
         recent_failures: List of TaskInstance objects to clear
     """
-    log_clearing(len(recent_failures))
-
     index = 0
     while index < len(recent_failures):
         page_to_clear = recent_failures[index : index + PAGE_SIZE]
