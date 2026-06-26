@@ -23,8 +23,17 @@ from pydantic import BaseModel
 
 from airflow.utils.session import create_session
 
-from plugins.big_red_button.auth import GetUserDep, RequiresDagEditDep
-from plugins.big_red_button.big_red_button import (
+app = FastAPI(title="Big Red Button API")
+
+STATIC_DIR = Path(__file__).parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# Imported after `app` is defined to avoid a circular import: the plugin module
+# (big_red_button.py) imports `app` from here at class-definition time, and
+# Airflow loads these modules alphabetically (api.py first).
+from plugins.big_red_button.auth import GetUserDep, RequiresDagEditDep  # noqa: E402
+from plugins.big_red_button.big_red_button import (  # noqa: E402
     clear_windows,
     get_dag_ids,
     get_dag_tags,
@@ -33,12 +42,6 @@ from plugins.big_red_button.big_red_button import (
     handle_clearing,
     log_clearing,
 )
-
-app = FastAPI(title="Big Red Button API")
-
-STATIC_DIR = Path(__file__).parent / "static"
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 class FailureInfo(BaseModel):
