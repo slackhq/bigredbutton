@@ -73,16 +73,17 @@ curl -sL "https://github.com/slackhq/bigredbutton/archive/refs/tags/2.10.2.tar.g
 
 **Route:** `/big-red-button`
 
-### Admin View
+### Admin Mode
 
-1. Navigate to **"Big Red Button: Admin"** in the Airflow UI
+Users with the Admin role see an **"Admin mode"** toggle on the same page
+(Airflow can't hide a plugin nav entry per role, so there is no separate admin page).
+
+1. Enable **"Admin mode"**
 2. Choose a time window
 3. View all failures across all DAGs (tags are optional filters)
 4. Clear individual DAGs or all failures at once
 
-**Route:** `/big-red-button-admin`
-
-All API endpoints require authentication (JWT cookie or Bearer token). Admin endpoints additionally require DAG task instance edit permission (`PUT` on `TASK_INSTANCE`). Set `BRB_AUTH_ENABLED=false` to disable auth enforcement for deployments behind an external auth proxy.
+All API endpoints require authentication (JWT cookie or Bearer token). The user clear endpoint requires DAG task instance edit permission (`PUT` on `TASK_INSTANCE`); admin endpoints require the Admin role. Set `BRB_AUTH_ENABLED=false` to disable auth enforcement for deployments behind an external auth proxy.
 
 ## REST API
 
@@ -95,6 +96,7 @@ All endpoints are mounted under `/big-red-button`.
 | GET | `/api/failures?clear_window=1_hour&tags=my_tag` | Get failures (tags required, dag_id optional) |
 | GET | `/api/tags` | List all DAG tags (optional `selected` param marks active tags) |
 | POST | `/api/clear` | Clear failures (tags or dag_id required) |
+| GET | `/api/me` | Whether the caller has the Admin role (`{"is_admin": bool}`) |
 
 ### Admin Endpoints
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   fetchFailures,
+  fetchMe,
   fetchTags,
   clearFailures,
   type FailuresResponse,
@@ -16,12 +17,20 @@ const CLEAR_WINDOWS = [
   { key: "7_days", label: "7 Days" },
 ];
 
-function useIsAdmin(): boolean {
-  return window.location.pathname.includes("big-red-button-admin");
+function useCanAdmin(): boolean {
+  const [canAdmin, setCanAdmin] = useState(false);
+  useEffect(() => {
+    fetchMe()
+      .then((me) => setCanAdmin(me.is_admin))
+      .catch(() => setCanAdmin(false));
+  }, []);
+  return canAdmin;
 }
 
 export function App() {
-  const isAdmin = useIsAdmin();
+  const canAdmin = useCanAdmin();
+  const [adminMode, setAdminMode] = useState(false);
+  const isAdmin = canAdmin && adminMode;
   const [clearWindow, setClearWindow] = useState("1_hour");
   const [tags, setTags] = useState<TagInfo[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -108,6 +117,17 @@ export function App() {
       <h1 className="brb-title">
         Big Red Button{isAdmin ? ": Admin" : ""}
       </h1>
+
+      {canAdmin && (
+        <label className="brb-admin-toggle">
+          <input
+            type="checkbox"
+            checked={adminMode}
+            onChange={(e) => setAdminMode(e.target.checked)}
+          />{" "}
+          Admin mode (all DAGs, no tag filter)
+        </label>
+      )}
 
       {message && (
         <div className="brb-message" onClick={() => setMessage(null)}>

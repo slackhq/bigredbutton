@@ -23,6 +23,7 @@ would benefit from integration tests with a real database and Flask app context.
 import sys
 import pytest
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Callable
 from unittest.mock import Mock, MagicMock, patch
 
@@ -376,6 +377,149 @@ class TestLogClearing:
         # - Mock or test Airflow auth manager
         # - Test database session
         assert True, "log_clearing requires integration tests with Flask context"
+
+
+class TestRequiresAdmin:
+    """Tests for the requires_admin auth dependency.
+
+    The admin endpoints must be restricted to the ADMIN role only. A non-admin
+    (VIEWER/USER/OP) -- including a read-capable user who can see the plugin
+    menu -- must be rejected with a 403.
+    """
+
+    class FakeHTTPException(Exception):
+        """Stand-in for fastapi.HTTPException (mocked out in this test suite)."""
+
+        def __init__(self, status_code=None, detail=None) -> None:
+            super().__init__(detail)
+            self.status_code = status_code
+            self.detail = detail
+
+    # Use SimpleNamespace, not Mock: a Mock auto-creates any attribute, which
+    # would hide a check reading the wrong attribute (e.g. .role on a FAB user).
+    @staticmethod
+    def _simple_user(role):
+        """SimpleAuthManager-style user: a single ``role`` string."""
+        return SimpleNamespace(role=role)
+
+    @staticmethod
+    def _fab_user(*role_names):
+        """FAB-style user: ``roles`` is a list of Role objects, no ``role``."""
+        return SimpleNamespace(roles=[SimpleNamespace(name=n) for n in role_names])
+
+    def _call(self, user, *, auth_enabled=True):
+        from plugins.big_red_button import auth
+
+        fake_status = Mock()
+        fake_status.HTTP_403_FORBIDDEN = 403
+        with patch.object(auth, "AUTH_ENABLED", auth_enabled), patch.object(
+            auth, "HTTPException", self.FakeHTTPException
+        ), patch.object(auth, "status", fake_status):
+            return auth.requires_admin(user)
+
+    def _assert_forbidden(self, user) -> None:
+        with pytest.raises(self.FakeHTTPException) as exc_info:
+            self._call(user)
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.parametrize("role", ["ADMIN", "admin"])
+    def test_simple_admin_role_allowed(self, role) -> None:
+        user = self._simple_user(role)
+        assert self._call(user) is user
+
+    @pytest.mark.parametrize("role", ["VIEWER", "USER", "OP", "", None])
+    def test_simple_non_admin_roles_forbidden(self, role) -> None:
+        self._assert_forbidden(self._simple_user(role))
+
+    def test_fab_admin_role_allowed(self) -> None:
+        user = self._fab_user("Admin")
+        assert self._call(user) is user
+
+    def test_fab_admin_among_multiple_roles_allowed(self) -> None:
+        user = self._fab_user("slack-user", "Admin")
+        assert self._call(user) is user
+
+    @pytest.mark.parametrize(
+        "role_names", [("slack-user",), ("airflow-mcp",), ("Viewer", "User"), ()]
+    )
+    def test_fab_non_admin_roles_forbidden(self, role_names) -> None:
+        # slack-user has can_edit on DAGs/Task Instances, so it passes the
+        # DAG-edit check -- it must still be rejected from admin endpoints.
+        self._assert_forbidden(self._fab_user(*role_names))
+
+    def test_user_without_role_attributes_forbidden(self) -> None:
+        self._assert_forbidden(SimpleNamespace())
+
+    def test_auth_disabled_bypasses_check(self) -> None:
+        # When auth is disabled (local/dev), the check is bypassed entirely.
+        user = self._fab_user("slack-user")
+        assert self._call(user, auth_enabled=False) is user
+
+    @pytest.mark.parametrize(
+        "user, expected",
+        [
+            (SimpleNamespace(roles=[SimpleNamespace(name="Admin")]), True),
+            (SimpleNamespace(role="ADMIN"), True),
+            (SimpleNamespace(roles=[SimpleNamespace(name="slack-user")]), False),
+            (SimpleNamespace(), False),
+        ],
+    )
+    def test_is_admin_matches_requires_admin(self, user, expected) -> None:
+        # /api/me uses is_admin to decide whether the UI offers admin mode.
+        from plugins.big_red_button import auth
+
+        with patch.object(auth, "AUTH_ENABLED", True):
+            assert auth.is_admin(user) is expected
+
+
+class TestRequiresDagEdit:
+    """Tests for the requires_dag_edit auth dependency.
+
+    The non-admin clear endpoint mutates task instances, so it must require
+    DAG-edit permission (USER+). A read-only VIEWER must be rejected with a 403.
+    """
+
+    class FakeHTTPException(Exception):
+        """Stand-in for fastapi.HTTPException (mocked out in this test suite)."""
+
+        def __init__(self, status_code=None, detail=None) -> None:
+            super().__init__(detail)
+            self.status_code = status_code
+            self.detail = detail
+
+    def _call(self, *, authorized, auth_enabled=True):
+        from plugins.big_red_button import auth
+
+        fake_status = Mock()
+        fake_status.HTTP_403_FORBIDDEN = 403
+        manager = Mock()
+        manager.is_authorized_dag.return_value = authorized
+        user = Mock()
+
+        with patch.object(auth, "AUTH_ENABLED", auth_enabled), patch.object(
+            auth, "HTTPException", self.FakeHTTPException
+        ), patch.object(auth, "status", fake_status), patch.object(
+            auth, "get_auth_manager", return_value=manager
+        ):
+            result = auth.requires_dag_edit(user)
+        return result, manager, user
+
+    def test_authorized_user_allowed(self) -> None:
+        result, manager, user = self._call(authorized=True)
+        assert result is user
+        # Must ask for edit (PUT) permission on task instances, not read.
+        _, kwargs = manager.is_authorized_dag.call_args
+        assert kwargs["method"] == "PUT"
+
+    def test_unauthorized_user_forbidden(self) -> None:
+        with pytest.raises(self.FakeHTTPException) as exc_info:
+            self._call(authorized=False)
+        assert exc_info.value.status_code == 403
+
+    def test_auth_disabled_bypasses_check(self) -> None:
+        result, manager, user = self._call(authorized=False, auth_enabled=False)
+        assert result is user
+        manager.is_authorized_dag.assert_not_called()
 
 
 class TestClearWindows:

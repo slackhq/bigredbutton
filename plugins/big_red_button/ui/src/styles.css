@@ -77,6 +77,15 @@
   margin-bottom: 24px;
 }
 
+.brb-admin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--brb-text);
+}
+
 .brb-control-group {
   display: flex;
   flex-direction: column;

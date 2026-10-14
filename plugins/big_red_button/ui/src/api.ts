@@ -34,6 +34,16 @@ export interface ClearResponse {
   cleared_count: number;
 }
 
+export interface MeResponse {
+  is_admin: boolean;
+}
+
+export async function fetchMe(): Promise<MeResponse> {
+  const res = await fetch(`${API_BASE}/me`);
+  if (!res.ok) throw new Error(`Failed to fetch user: ${res.statusText}`);
+  return res.json();
+}
+
 export async function fetchFailures(
   clearWindow: string,
   isAdmin: boolean,
