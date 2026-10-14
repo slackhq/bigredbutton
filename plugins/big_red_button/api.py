@@ -32,7 +32,11 @@ if STATIC_DIR.exists():
 # Imported after `app` is defined to avoid a circular import: the plugin module
 # (big_red_button.py) imports `app` from here at class-definition time, and
 # Airflow loads these modules alphabetically (api.py first).
-from plugins.big_red_button.auth import GetUserDep, RequiresDagEditDep  # noqa: E402
+from plugins.big_red_button.auth import (  # noqa: E402
+    GetUserDep,
+    RequiresAdminDep,
+    RequiresDagEditDep,
+)
 from plugins.big_red_button.big_red_button import (  # noqa: E402
     clear_windows,
     get_dag_ids,
@@ -103,7 +107,8 @@ def _build_failures_response(failures_by_dag: dict) -> FailuresResponse:
 
 
 # ---------------------------------------------------------------------------
-# User endpoints — tag-scoped, requires tags to be specified
+# User endpoints — tag-scoped, requires tags to be specified.
+# Reads require authentication; the clear mutation requires DAG-edit permission.
 # ---------------------------------------------------------------------------
 
 
@@ -146,7 +151,7 @@ async def get_tags(
 
 
 @app.post("/api/clear", response_model=ClearResponse)
-async def clear_failures(req: ClearRequest, user: GetUserDep):
+async def clear_failures(req: ClearRequest, user: RequiresDagEditDep):
     if req.clear_window not in clear_windows:
         raise HTTPException(
             status_code=400, detail=f"Invalid clear_window: {req.clear_window}"
@@ -186,14 +191,17 @@ async def clear_failures(req: ClearRequest, user: GetUserDep):
 
 
 # ---------------------------------------------------------------------------
-# Admin endpoints — unrestricted, can operate on all DAGs
-# Access controlled via Airflow RBAC on the /big-red-button-admin route
+# Admin endpoints — unrestricted, can operate on all DAGs.
+# Restricted to the ADMIN role via RequiresAdminDep. The admin page itself is a
+# client-side-only react_app route with no server RBAC (any VIEWER can see the
+# menu item and open it), so these endpoints are the real security boundary:
+# non-admins receive a 403.
 # ---------------------------------------------------------------------------
 
 
 @app.get("/api/admin/failures", response_model=FailuresResponse)
 async def get_failures_admin(
-    user: RequiresDagEditDep,
+    user: RequiresAdminDep,
     clear_window: str = Query(default="1_hour", enum=list(clear_windows.keys())),
     tags: Optional[list[str]] = Query(default=None),
     dag_id: Optional[str] = Query(default=None),
@@ -222,7 +230,7 @@ async def get_failures_admin(
 
 
 @app.post("/api/admin/clear", response_model=ClearResponse)
-async def clear_failures_admin(req: ClearRequest, user: RequiresDagEditDep):
+async def clear_failures_admin(req: ClearRequest, user: RequiresAdminDep):
     if req.clear_window not in clear_windows:
         raise HTTPException(
             status_code=400, detail=f"Invalid clear_window: {req.clear_window}"

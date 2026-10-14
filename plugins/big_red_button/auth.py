@@ -76,7 +76,12 @@ GetUserDep = Annotated[BaseUser, Depends(get_user)]
 
 
 def requires_dag_edit(user: GetUserDep) -> BaseUser:
-    """Require permission to edit DAG task instances (admin-level clear operations)."""
+    """Require permission to edit DAG task instances.
+
+    Gates the non-admin clear endpoint, which mutates task instances (scoped to
+    the caller's tags/dag_id). Read-only users (VIEWER) are rejected; USER-level
+    accounts and above are allowed.
+    """
     if not AUTH_ENABLED:
         return user
 
@@ -92,3 +97,42 @@ def requires_dag_edit(user: GetUserDep) -> BaseUser:
 
 
 RequiresDagEditDep = Annotated[BaseUser, Depends(requires_dag_edit)]
+
+
+ADMIN_ROLE = "admin"
+
+
+def _role_names(user: BaseUser) -> set[str]:
+    """Return the user's role names, lowercased.
+
+    FAB-based auth managers expose ``user.roles`` (a list of Role objects with
+    ``.name``, e.g. "Admin"). SimpleAuthManager exposes a single ``user.role``
+    string (e.g. "ADMIN"). Support both.
+    """
+    names = set()
+    for r in getattr(user, "roles", None) or []:
+        name = getattr(r, "name", None)
+        if isinstance(name, str):
+            names.add(name.lower())
+    role = getattr(user, "role", None)
+    if isinstance(role, str):
+        names.add(role.lower())
+    return names
+
+
+def requires_admin(user: GetUserDep) -> BaseUser:
+    """Restrict admin endpoints to users with the Admin role.
+
+    The admin UI operates on all DAGs unscoped, so it must be gated on the
+    Admin role itself -- not on DAG-edit permission (which USER-level accounts
+    also have) nor on plugin/menu read access (which any VIEWER has).
+    """
+    if not AUTH_ENABLED:
+        return user
+
+    if ADMIN_ROLE not in _role_names(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    return user
+
+
+RequiresAdminDep = Annotated[BaseUser, Depends(requires_admin)]
