@@ -455,6 +455,22 @@ class TestRequiresAdmin:
         user = self._fab_user("slack-user")
         assert self._call(user, auth_enabled=False) is user
 
+    @pytest.mark.parametrize(
+        "user, expected",
+        [
+            (SimpleNamespace(roles=[SimpleNamespace(name="Admin")]), True),
+            (SimpleNamespace(role="ADMIN"), True),
+            (SimpleNamespace(roles=[SimpleNamespace(name="slack-user")]), False),
+            (SimpleNamespace(), False),
+        ],
+    )
+    def test_is_admin_matches_requires_admin(self, user, expected) -> None:
+        # /api/me uses is_admin to decide whether the UI offers admin mode.
+        from plugins.big_red_button import auth
+
+        with patch.object(auth, "AUTH_ENABLED", True):
+            assert auth.is_admin(user) is expected
+
 
 class TestRequiresDagEdit:
     """Tests for the requires_dag_edit auth dependency.

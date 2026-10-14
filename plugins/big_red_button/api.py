@@ -36,6 +36,7 @@ from plugins.big_red_button.auth import (  # noqa: E402
     GetUserDep,
     RequiresAdminDep,
     RequiresDagEditDep,
+    is_admin,
 )
 from plugins.big_red_button.big_red_button import (  # noqa: E402
     clear_windows,
@@ -82,6 +83,10 @@ class ClearResponse(BaseModel):
     cleared_count: int
 
 
+class MeResponse(BaseModel):
+    is_admin: bool
+
+
 def _build_failures_response(failures_by_dag: dict) -> FailuresResponse:
     total = 0
     dags = []
@@ -104,6 +109,12 @@ def _build_failures_response(failures_by_dag: dict) -> FailuresResponse:
             )
         )
     return FailuresResponse(total_failures=total, dags=dags)
+
+
+@app.get("/api/me", response_model=MeResponse)
+async def get_me(user: GetUserDep):
+    """Tell the UI whether to offer admin mode. Not a security boundary."""
+    return MeResponse(is_admin=is_admin(user))
 
 
 # ---------------------------------------------------------------------------
@@ -192,9 +203,9 @@ async def clear_failures(req: ClearRequest, user: RequiresDagEditDep):
 
 # ---------------------------------------------------------------------------
 # Admin endpoints — unrestricted, can operate on all DAGs.
-# Restricted to the ADMIN role via RequiresAdminDep. The admin page itself is a
-# client-side-only react_app route with no server RBAC (any VIEWER can see the
-# menu item and open it), so these endpoints are the real security boundary:
+# Restricted to the ADMIN role via RequiresAdminDep. Airflow can't hide a
+# react_app nav entry per role, so the single page only offers admin mode when
+# /api/me reports is_admin. These endpoints are the real security boundary:
 # non-admins receive a 403.
 # ---------------------------------------------------------------------------
 

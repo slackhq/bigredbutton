@@ -120,6 +120,11 @@ def _role_names(user: BaseUser) -> set[str]:
     return names
 
 
+def is_admin(user: BaseUser) -> bool:
+    """Return True if the user holds the Admin role (always True with auth off)."""
+    return not AUTH_ENABLED or ADMIN_ROLE in _role_names(user)
+
+
 def requires_admin(user: GetUserDep) -> BaseUser:
     """Restrict admin endpoints to users with the Admin role.
 
@@ -127,10 +132,7 @@ def requires_admin(user: GetUserDep) -> BaseUser:
     Admin role itself -- not on DAG-edit permission (which USER-level accounts
     also have) nor on plugin/menu read access (which any VIEWER has).
     """
-    if not AUTH_ENABLED:
-        return user
-
-    if ADMIN_ROLE not in _role_names(user):
+    if not is_admin(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return user
 
