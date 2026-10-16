@@ -249,6 +249,5 @@ class BigRedButtonPlugin(AirflowPlugin):
             "name": "Big Red Button",
             "url_route": "big-red-button",
             "bundle_url": "/big-red-button/static/big-red-button.js",
-            "category": "Admin",
         },
     ]
