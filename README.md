@@ -47,9 +47,8 @@ airflow webserver
 
 4. **Access the plugin:**
 
-Navigate to your Airflow UI and look for:
-- **"Big Red Button"** in the Admin menu (tag-filtered view)
-- **"Big Red Button: Admin"** in the Admin menu (unrestricted view)
+Navigate to your Airflow UI and look for **"Big Red Button"** in the Plugins menu.
+Users with the Admin role also get an admin mode on that page (unrestricted view).
 
 ### Airflow 2 (legacy)
 
